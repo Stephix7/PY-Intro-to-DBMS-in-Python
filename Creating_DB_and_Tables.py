@@ -90,15 +90,103 @@ for idx, row in enumerate(csv_reader):
 print(total_rowcount)
 
 # ---------------------------------------------------------------
-#
+# Updating individual records
 # ---------------------------------------------------------------
+
+# Build a select statement: select_stmt
+select_stmt = select([state_fact]).where(state_fact.columns.name == 'New York')
+# Print the results of executing the select_stmt
+print(connection.execute(select_stmt).fetchall())
+# Build a statement to update the fips_state to 36: stmt
+stmt = update(state_fact).values(fips_state=36)
+# Append a where clause to limit it to records for New York state
+stmt = stmt.where(state_fact.columns.name == 'New York')
+# Execute the statement: results
+results = connection.execute(stmt)
+# Print rowcount
+print(results.rowcount)
+# Execute the select_stmt again to view the changes
+print(connection.execute(select_stmt).fetchall())
+
+# ---------------------------------------------------------------
+# Updating Multiple Records
+# ---------------------------------------------------------------
+
+# Build a statement to update the notes to 'The Wild West': stmt
+stmt = update(state_fact).values(notes='The Wild West')
+# Append a where clause to match the West census region records
+stmt = stmt.where(state_fact.columns.census_region_name == 'West')
+# Execute the statement: results
+results = connection.execute(stmt)
+# Print rowcount
+print(results.rowcount)
+
+# ---------------------------------------------------------------
+# Correlated Updates
+# ---------------------------------------------------------------
+
+# Build a statement to select name from state_fact: stmt
+fips_stmt = select([state_fact.columns.name])
+# Append a where clause to Match the fips_state to flat_census fips_code
+fips_stmt = fips_stmt.where(
+    state_fact.columns.fips_state == flat_census.columns.fips_code)
+# Build an update statement to set the name to fips_stmt: update_stmt
+update_stmt = update(flat_census).values(state_name=fips_stmt)
+# Execute update_stmt: results
+results = connection.execute(update_stmt)
+# Print rowcount
+print(results.rowcount)
 
 
 # ---------------------------------------------------------------
-#
+# Deleting all the records from a table
 # ---------------------------------------------------------------
 
+# Import delete, select
+from sqlalchemy import delete, select
+# Build a statement to empty the census table: stmt
+stmt = delete(census)
+# Execute the statement: results
+results = connection.execute(stmt)
+# Print affected rowcount
+print(results.rowcount)
+# Build a statement to select all records from the census table
+stmt = select([census])
+# Print the results of executing the statement to verify there are no rows
+print(connection.execute(stmt).fetchall())
 
 # ---------------------------------------------------------------
-#
+# Deleting specific records
 # ---------------------------------------------------------------
+
+# Build a statement to count records using the sex column for Men ('M') age 36: stmt
+stmt = select([func.count(census.columns.sex)]).where(
+    and_(census.columns.sex == 'M',
+         census.columns.age == 36)
+)
+# Execute the select statement and use the scalar() fetch method to save the record count
+to_delete = connection.execute(stmt).scalar()
+# Build a statement to delete records from the census table: stmt_del
+stmt_del = delete(census).where(stmt)
+# Append a where clause to target Men ('M') age 36
+stmt_del = stmt_del.where(
+    and_(census.columns.sex == 'M',
+         census.columns.age == 36)
+)
+# Execute the statement: results
+results = connection.execute(stmt_del)
+# Print affected rowcount and to_delete record count, make sure they match
+print(results.rowcount, to_delete)
+
+# ---------------------------------------------------------------
+# Deleting a Table Completely
+# ---------------------------------------------------------------
+
+# Drop the state_fact table
+state_fact.drop(engine)
+# Check to see if state_fact exists
+print(state_fact.exists(engine))
+# Drop all tables
+metadata.drop_all(engine)
+# Check to see if census exists
+print(census.exists(engine))
